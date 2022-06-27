@@ -9,14 +9,34 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(cors());
-const mongoClient = new MongoClient("mongodb://127.0.0.1:27017");
+const mongoClient = new MongoClient(process.env.MONGO_URI);
 
 const QUINZE_SEGUNDOS = 15*1000;
 const DEZ_SEGUNDOS = 10;
 
+const validaNome = joi.object({
+                        name: joi.string().required()
+                    });
+
+const validaMensagem = joi.object({
+        /* from: joi.string().valid().required(), */
+        to: joi.string().required(),
+        text: joi.string().required(),
+        type: joi.string().valid("private_message", "message").required()
+    });
+
 app.post("/participants", async (req, res) => {
 
-    let nome = req.body.name;
+    let nome = req.body;
+    const validar = validaNome.validate(nome);
+
+    if(validar.error){
+        res.sendStatus(422);
+        return;
+    } else {
+        nome = req.body.name;
+    }
+
     let cadastro = {
         name: nome,
         lastStatus: Date.now()
@@ -91,6 +111,7 @@ app.post("/messages", async (req, res) => {
         const mensagensCollection = uoldb.collection("mensagens");
         
         const { to, text, type } = req.body;
+        const validar = validaMensagem.validate(req.body);
         const usuario = req.headers.user;
         const horaEnvio = dayjs().format("hh:mm:ss");
 
@@ -102,10 +123,14 @@ app.post("/messages", async (req, res) => {
             time: horaEnvio
         }
 
-        mensagensCollection.insertOne(mensagemPost);
-        res.sendStatus(201);
-
-        return;
+        if(validar.error){
+            res.sendStatus(422);
+            return;
+        } else { 
+            mensagensCollection.insertOne(mensagemPost);
+            res.sendStatus(201);
+            return;
+        } 
 
     }
 
@@ -218,4 +243,4 @@ app.post("/status", async (req, res) => {
 
 setInterval(removerParticipantes, QUINZE_SEGUNDOS); */
 
-app.listen(5000);
+app.listen(process.env.PORT);
