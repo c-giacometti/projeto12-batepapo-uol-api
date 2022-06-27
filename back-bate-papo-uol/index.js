@@ -19,7 +19,6 @@ const validaNome = joi.object({
                     });
 
 const validaMensagem = joi.object({
-        /* from: joi.string().valid().required(), */
         to: joi.string().required(),
         text: joi.string().required(),
         type: joi.string().valid("private_message", "message").required()
@@ -27,56 +26,55 @@ const validaMensagem = joi.object({
 
 app.post("/participants", async (req, res) => {
 
-    let nome = req.body;
-    const validar = validaNome.validate(nome);
+    const validar = validaNome.validate(req.body);
 
     if(validar.error){
         res.sendStatus(422);
         return;
     } else {
-        nome = req.body.name;
-    }
+    
+        let nome = req.body.name;
 
-    let cadastro = {
-        name: nome,
-        lastStatus: Date.now()
-    }
+        let cadastro = {
+            name: nome,
+            lastStatus: Date.now()
+        }
 
-    try {
-        await mongoClient.connect();
+        try {
+            await mongoClient.connect();
 
-        const uoldb = mongoClient.db("uol");
-        const usuariosCollection = uoldb.collection("users");
-        const mensagensCollection = uoldb.collection("mensagens");
+            const uoldb = mongoClient.db("uol");
+            const usuariosCollection = uoldb.collection("users");
+            const mensagensCollection = uoldb.collection("mensagens");
 
-        const nomeEmUso = await usuariosCollection.find({ name: nome }).toArray();
+            const nomeEmUso = await usuariosCollection.find({ name: nome }).toArray();
 
-        if(nomeEmUso.length > 0){
-            res.status(409).send("Este nome de usuário já está sendo utilizado");
-            return;
-        } else {
-            const horaEntrada = dayjs().format("hh:mm:ss");
-            const mensagemEntrou = {
-                from: nome,
-                to: "Todos",
-                text: "entra na sala...",
-                type: "status",
-                time: horaEntrada
+            if(nomeEmUso.length > 0){
+                res.status(409).send("Este nome de usuário já está sendo utilizado");
+                return;
+            } else {
+                const horaEntrada = dayjs().format("hh:mm:ss");
+                const mensagemEntrou = {
+                    from: nome,
+                    to: "Todos",
+                    text: "entra na sala...",
+                    type: "status",
+                    time: horaEntrada
+                }
+
+                usuariosCollection.insertOne(cadastro);
+                mensagensCollection.insertOne(mensagemEntrou);
+                res.sendStatus(201);
+                return;
             }
+        }
 
-            usuariosCollection.insertOne(cadastro);
-            mensagensCollection.insertOne(mensagemEntrou);
-            res.sendStatus(201);
+        catch(error){
+            res.sendStatus(500);
+            mongoClient.close();
             return;
         }
     }
-
-    catch(error){
-        res.sendStatus(500);
-        mongoClient.close();
-        return;
-    }
-
 });
 
 app.get("/participants", async (req, res) => {
