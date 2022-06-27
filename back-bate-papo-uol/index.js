@@ -3,6 +3,7 @@ import cors from "cors";
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 import dayjs from 'dayjs';
+import joi from 'joi';
 
 dotenv.config();
 const app = express();
@@ -90,7 +91,7 @@ app.post("/messages", async (req, res) => {
         const mensagensCollection = uoldb.collection("mensagens");
         
         const { to, text, type } = req.body;
-        const usuario = req.headers.User;
+        const usuario = req.headers.user;
         const horaEnvio = dayjs().format("hh:mm:ss");
 
         const mensagemPost = {
@@ -120,20 +121,26 @@ app.get("/messages", async (req, res) => {
 
     try {
         const limite = parseInt(req.query.limit);
+        const usuario = req.headers.user;
 
         await mongoClient.connect();
         const uoldb = mongoClient.db("uol");
         const mensagensCollection = uoldb.collection("mensagens");
         const mensagensGet = await mensagensCollection.find().toArray();
 
-        if(!limite){
-            const mensagensRetornadas = mensagensGet.reverse();
-            res.send(mensagensRetornadas).status(201);
+        const mensagensVisiveis = mensagensGet.filter(usuarioPodeVer);
+
+        if(!limite || limite >= mensagensVisiveis.length){
+            res.send(mensagensVisiveis).status(201); 
             return;
         } else {
-            const mensagensRetornadas = mensagensGet.reverse().splice(0, limite);
-            res.send(mensagensRetornadas).status(201);
+            const mensagensComLimite = mensagensVisiveis.splice(0, limite);
+            res.send(mensagensComLimite).status(201); 
             return;
+        }
+
+        function usuarioPodeVer(item){
+            return item.from === usuario || item.to === "Todos" || item.to === usuario;
         }
     }
 
@@ -179,7 +186,7 @@ app.post("/status", async (req, res) => {
 
 });
 
-async function removerParticipantes(){
+/* async function removerParticipantes(){
     await mongoClient.connect();
 
     const uoldb = mongoClient.db("uol");
@@ -209,6 +216,6 @@ async function removerParticipantes(){
     });
 }
 
-setInterval(removerParticipantes, QUINZE_SEGUNDOS);
+setInterval(removerParticipantes, QUINZE_SEGUNDOS); */
 
 app.listen(5000);
